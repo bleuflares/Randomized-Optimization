@@ -9,7 +9,7 @@ def euc_dist(arr1, arr2):
     return np.sum(np.dot(diff, diff))
 
 def get_accident_input():
-    file = open("dataset/Accident.csv", 'r')
+    file = open("dataset/Admission_Predict_Ver1.1.csv", 'r')
     return np.loadtxt(file, delimiter=",", skiprows=1)
 
 class NeuralNet():
@@ -28,7 +28,7 @@ class NeuralNet():
         return -sum(error)
 
     def get_best(self):
-        return np.array([random.uniform(-1, 1) for i in range(13)])
+        return np.array([random.uniform(-1, 1) for i in range(8)])
 
     def get_neighbors(self, weight):
         n_weights = []
@@ -48,7 +48,7 @@ def Hill_Climbing(nn, max_iter):
     count = 0
 
     while True:
-        old_fit = 0
+        old_fit = -0xffffffff
         best_fit_neighbor = nn.get_neighbors(x_best)[0]
         for neighbor in nn.get_neighbors(x_best):
             fit = nn.get_fit(neighbor)
@@ -91,23 +91,25 @@ def Simulated_Annealing(nn, max_iter, T0=1, tchange=.01):
             x_best = rand_neighbor
             fit = best_fit
         else:
-            val = math.e ** ((fit - old_fit) / temp)
+            val = math.e ** ((fit - best_fit) / T)
             if random.uniform(0,1) < val:
                 x_best = rand_neighbor
                 fit = best_fit
         T -= tchange
         iterations += 1
-        if iterations > n:
+        if iterations > max_iter:
             break
 
     return x_best, best_fit
 
 def crossover(gene1, gene2):
+    print(gene1)
+    print(gene2)
     pos = random.randint(0, len(gene1) - 1)
-    return gene1[pos:] + gene2[:pos]
+    return np.append(gene1[pos:], gene2[:pos])
 
 def Generic_Algorithm(nn, max_iter, init_population=[]):
-    #init_population = [nn.get_best() for i in range(pop_size)]
+    population = init_population
     old_population = []
     iterations = 1
 
@@ -115,63 +117,94 @@ def Generic_Algorithm(nn, max_iter, init_population=[]):
         if old_population == population or iterations > max_iter:
             break
         fits = [nn.get_fit(x) for x in population]
-        best_fits = fits.sort()[:2]
-        least_fits = fits.sort()[len(fits) - 1]
+        best_fits = sorted(fits)[len(fits) - 2 :]
+        least_fits = sorted(fits)[0]
         best_fit_population = [population[fits.index(x)] for x in best_fits]
         old_population = population
         crossovered = crossover(best_fit_population[0], best_fit_population[1])
-        population[least_fits] = crossovered
+        population[fits.index(least_fits)] = crossovered
         iterations += 1
 
     fits = [nn.get_fit(x) for x in population]
-    best_fit = fits.sort()[0]
-    best_fit_gene = population[best_fit]
+    best_fit = sorted(fits)[0]
+    best_fit_gene = population[fits.index(best_fit)]
     return best_fit_gene, best_fit
 
 if __name__ == "__main__":
-    print("big input")
+    print("small input")
     array = get_accident_input()
-    x = array[:, :13]
+    x = array[:, :8]
     x = (x / x.max(axis=0))
     tx = x[:len(array) * 9 / 10]
-    ty = array[:len(array) * 9 / 10, 13]
+    ty = array[:len(array) * 9 / 10, 8]
     vx = x[len(array) * 9 / 10:]
-    vy = array[len(array) * 9 / 10:, 13]
+    vy = array[len(array) * 9 / 10:, 8]
+
+    def validate(weights, vx, vy):
+        outputs = 1 / (1 + np.exp(-(np.matmul(vx, weights))))
+        error = abs(vy - outputs)
+        print(len(error))
+        print(sum(np.square(error)) / len(error))
+
 
     def HC_max_iter(inputs, outputs):
         lrs = [.001, .01, .1, .5]
-        iters = [1, 5, 10, 20, 50,100]
-        record = np.zeros((len(lrs), len(iters)))
+        iters = [1, 5, 10, 20, 50, 100]
+
+        best_fit = -0xffffffff
+        weight = []
         for y_count, iteration in enumerate(iters):
             for x_count, lr in enumerate(lrs):
                 nn = NeuralNet(inputs, outputs, lr)
-                best, fit = nn.train(Hill_Climbing, max_iter=int(iteration))
-                print(y_count, x_count)
-                record[x_count, y_count] = fit
-        print(record)
-
-    def SA_T(inputs, outputs):
+                weight, fit = nn.train(Hill_Climbing, max_iter=int(iteration))
+                if fit > best_fit:
+                    best_weight = weight
+        validate(best_weight, vx, vy)
+        
+    def SA_temperature(inputs, outputs):
         T_min = 1
         T_max = 100
         
-        d_min = 1
-        d_max = 20
+        dt_min = 1
+        dt_max = 20
         
         Ts = np.linspace(T_min, T_max, 15)
-        ds = np.linspace(d_min, d_max, 15)
-        print(ds, Ts)
+        dts = np.linspace(dt_min, dt_max, 15)
 
-        record = np.zeros((len(ds), len(Ts)))
-        for y_count, d in enumerate(ds):
+        best_fit = -0xffffffff
+        weight = []
+        for y_count, dt in enumerate(dts):
             for x_count, t in enumerate(Ts):
                 
                 nn = NeuralNet(inputs, outputs, .1)
-                best, score = nn.train(SA, 20, T0=t, dt=d)
-                record[x_count, y_count] = score
-            print(y_count)
-        print(record)
+                weight, fit = nn.train(Simulated_Annealing, 20, T0=t, tchange=dt)
+                if fit > best_fit:
+                    best_weight = weight
+        validate(best_weight, vx, vy)
+
+    def GA_population_length(inputs, outputs):
+        lr_min = 0
+        lr_max = .5
+        
+        pop_min = 10
+        pop_max = 110
+        
+        lrs = np.linspace(lr_min, lr_max, 10)
+        pops = np.linspace(pop_min, pop_max, 10)
+
+        best_fit = -0xffffffff
+        weight = []
+        for x_count, lr in enumerate(lrs):
+            for y_count, pop_len in enumerate(pops):
+                nn = NeuralNet(inputs, outputs, lr)
+                init_population = [nn.get_best() for i in range(int(pop_len))]
+                weight, fit = nn.train(Generic_Algorithm, 50, init_population=init_population)
+                if fit > best_fit:
+                    best_weight = weight
+        validate(best_weight, vx, vy)
 
     HC_max_iter(tx, ty)
-    SA_T(tx, ty)
+    SA_temperature(tx, ty)
+    GA_population_length(tx, ty)
 
 
