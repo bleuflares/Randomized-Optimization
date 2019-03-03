@@ -103,8 +103,6 @@ def Simulated_Annealing(nn, max_iter, T0=1, tchange=.01):
     return x_best, best_fit
 
 def crossover(gene1, gene2):
-    print(gene1)
-    print(gene2)
     pos = random.randint(0, len(gene1) - 1)
     return np.append(gene1[pos:], gene2[:pos])
 
@@ -153,13 +151,16 @@ if __name__ == "__main__":
         record = np.zeros((len(lrs), len(iters)))
         best_fit = -0xffffffff
         weight = []
+        hyperparams = (0, 0)
         for y_count, iteration in enumerate(iters):
             for x_count, lr in enumerate(lrs):
                 nn = NeuralNet(inputs, outputs, lr)
                 weight, fit = nn.train(Hill_Climbing, max_iter=int(iteration))
                 record[x_count, y_count] = validate(weight, vx, vy)
-        print(record)
+                if fit > best_fit:
+                    hyperparams = (x_count, y_count)
         np.savetxt("HC.csv", record, delimiter=",")
+        print(hyperparams)
         
     def SA_temperature(inputs, outputs):
         print("Simulated Annealing")
@@ -175,14 +176,18 @@ if __name__ == "__main__":
         record = np.zeros((len(dts), len(Ts)))
         best_fit = -0xffffffff
         weight = []
+        hyperparams = (0, 0)
         for y_count, dt in enumerate(dts):
             for x_count, t in enumerate(Ts):
                 
                 nn = NeuralNet(inputs, outputs, .1)
                 weight, fit = nn.train(Simulated_Annealing, 20, T0=t, tchange=dt)
                 record[x_count, y_count] = validate(weight, vx, vy)
-        print(record)
+                if fit > best_fit:
+                    hyperparams = (x_count, y_count)
+        
         np.savetxt("SA.csv", record, delimiter=",")
+        print(hyperparams)
 
     def GA_population_length(inputs, outputs):
         print("Generic Algorithm")
@@ -198,14 +203,17 @@ if __name__ == "__main__":
         record = np.zeros((len(pops), len(lrs)))
         best_fit = -0xffffffff
         weight = []
+        hyperparams = (0, 0)
         for x_count, lr in enumerate(lrs):
             for y_count, pop_len in enumerate(pops):
                 nn = NeuralNet(inputs, outputs, lr)
                 init_population = [nn.get_best() for i in range(int(pop_len))]
                 weight, fit = nn.train(Generic_Algorithm, 50, init_population=init_population)
                 record[x_count, y_count] = validate(weight, vx, vy)
-        print(record)
+                if fit > best_fit:
+                    hyperparams = (x_count, y_count)
         np.savetxt("GA.csv", record, delimiter=",")
+        print(hyperparams)
 
     HC_max_iter(tx, ty)
     SA_temperature(tx, ty)
