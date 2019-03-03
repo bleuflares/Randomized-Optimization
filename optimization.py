@@ -143,25 +143,26 @@ if __name__ == "__main__":
     def validate(weights, vx, vy):
         outputs = 1 / (1 + np.exp(-(np.matmul(vx, weights))))
         error = abs(vy - outputs)
-        print(len(error))
-        print(sum(np.square(error)) / len(error))
+        return sum(np.square(error)) / len(error)
 
 
     def HC_max_iter(inputs, outputs):
+        print("Hill Hill_Climbing")
         lrs = [.001, .01, .1, .5]
         iters = [1, 5, 10, 20, 50, 100]
-
+        record = np.zeros((len(lrs), len(iters)))
         best_fit = -0xffffffff
         weight = []
         for y_count, iteration in enumerate(iters):
             for x_count, lr in enumerate(lrs):
                 nn = NeuralNet(inputs, outputs, lr)
                 weight, fit = nn.train(Hill_Climbing, max_iter=int(iteration))
-                if fit > best_fit:
-                    best_weight = weight
-        validate(best_weight, vx, vy)
+                record[x_count, y_count] = validate(weight, vx, vy)
+        print(record)
+        np.savetxt("HC.csv", record, delimiter=",")
         
     def SA_temperature(inputs, outputs):
+        print("Simulated Annealing")
         T_min = 1
         T_max = 100
         
@@ -171,6 +172,7 @@ if __name__ == "__main__":
         Ts = np.linspace(T_min, T_max, 15)
         dts = np.linspace(dt_min, dt_max, 15)
 
+        record = np.zeros((len(dts), len(Ts)))
         best_fit = -0xffffffff
         weight = []
         for y_count, dt in enumerate(dts):
@@ -178,11 +180,12 @@ if __name__ == "__main__":
                 
                 nn = NeuralNet(inputs, outputs, .1)
                 weight, fit = nn.train(Simulated_Annealing, 20, T0=t, tchange=dt)
-                if fit > best_fit:
-                    best_weight = weight
-        validate(best_weight, vx, vy)
+                record[x_count, y_count] = validate(weight, vx, vy)
+        print(record)
+        np.savetxt("SA.csv", record, delimiter=",")
 
     def GA_population_length(inputs, outputs):
+        print("Generic Algorithm")
         lr_min = 0
         lr_max = .5
         
@@ -192,6 +195,7 @@ if __name__ == "__main__":
         lrs = np.linspace(lr_min, lr_max, 10)
         pops = np.linspace(pop_min, pop_max, 10)
 
+        record = np.zeros((len(pops), len(lrs)))
         best_fit = -0xffffffff
         weight = []
         for x_count, lr in enumerate(lrs):
@@ -199,9 +203,9 @@ if __name__ == "__main__":
                 nn = NeuralNet(inputs, outputs, lr)
                 init_population = [nn.get_best() for i in range(int(pop_len))]
                 weight, fit = nn.train(Generic_Algorithm, 50, init_population=init_population)
-                if fit > best_fit:
-                    best_weight = weight
-        validate(best_weight, vx, vy)
+                record[x_count, y_count] = validate(weight, vx, vy)
+        print(record)
+        np.savetxt("GA.csv", record, delimiter=",")
 
     HC_max_iter(tx, ty)
     SA_temperature(tx, ty)
